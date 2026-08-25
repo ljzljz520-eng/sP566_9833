@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "metrics": {
+    "production_loc": 2400,
+    "production_files": 25,
+    "production_packages": 10,
+    "test_files": 9,
+    "production_functions": 190,
+    "decision_points": 342
+  },
+  "persistence": {
+    "module": "go.etcd.io/bbolt",
+    "entities": [
+      "PatientRecord",
+      "PrescriptionOrder",
+      "PharmacyTicket",
+      "ClaimEvent"
+    ],
+    "reopen_test": "TestPersistenceSurvivesReopen"
+  },
+  "workflows": [
+    {
+      "steps": [
+        "record patient identity and contact",
+        "record prescription medication and instructions",
+        "allocate a deterministic pickup number",
+        "persist the intake receipt and pending state"
+      ],
+      "test": "TestWorkflowRegistrationAndSearch"
+    },
+    {
+      "steps": [
+        "inspect the pending pickup list",
+        "validate a service window",
+        "claim one pending number",
+        "show the number in the called list"
+      ],
+      "test": "TestWorkflowCallingMovesTicket"
+    },
+    {
+      "steps": [
+        "accept a called number at the counter",
+        "record the dispensing operator",
+        "move the number to completed history",
+        "reopen storage and restore completion order"
+      ],
+      "test": "TestWorkflowCompletionPersistsOrder"
+    }
+  ]
+}
