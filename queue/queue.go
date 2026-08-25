@@ -73,17 +73,33 @@ func (q *Queue) Claim(number, window string) (model.PharmacyTicket, error) {
 	if window == "" {
 		return model.PharmacyTicket{}, ErrWindowMissing
 	}
-	q.mu.RLock()
-	ticket, ok := q.pending[number]
-	q.mu.RUnlock()
-	if !ok {
-		return model.PharmacyTicket{}, ErrTicketMissing
-	}
+	// The seam is intentionally outside the write lock: tests use it to widen
+	// the race window so two callers can be parked here at once. The fix lives
+	// below — the actual pending->called transition is re-checked atomically
+	// under the write lock, so whichever caller wins the lock moves the ticket
+	// and the second caller observes it as already called instead of moving it
+	// a second time on a stale copy.
 	if q.claimPause != nil {
 		q.claimPause()
 	}
+	// Decide the transition entirely under the write lock. A caller that loses
+	// the race must read the current (now moved) state, not a stale pending
+	// copy captured before the lock. This is what prevents two windows from
+	// both reporting the number as called.
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	// A ticket already claimed by another window wins the race: surface the
+	// existing called record so the caller can report where it was routed.
+	if current, ok := q.called[number]; ok {
+		return current, ErrAlreadyCalled
+	}
+	if _, ok := q.finished[number]; ok {
+		return model.PharmacyTicket{}, ErrAlreadyCalled
+	}
+	ticket, ok := q.pending[number]
+	if !ok {
+		return model.PharmacyTicket{}, ErrTicketMissing
+	}
 	if err := model.ValidateTransition(ticket.Status, model.StatusCalled); err != nil {
 		return model.PharmacyTicket{}, err
 	}
