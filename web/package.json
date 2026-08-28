@@ -1,0 +1,7 @@
+{
+  "name": "pharmacy-counter-web",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {"node": ">=20"},
+  "scripts": {"build": "node -e \"console.log('static pharmacy counter assets ready')\""}
+}
